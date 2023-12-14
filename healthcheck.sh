@@ -27,7 +27,7 @@ block_count=$(cli getblockcount 2> /dev/null)
 latest_block_hash=$(cli getblockhash $block_count 2> /dev/null)
 [ -n "$latest_block_hash" ] || exit 1
 
-latest_block_time_stamp=$(cli getblock $latest_block_hash 2> /dev/null | awk -F ':' '($1 ~ /\s*"time"/) { sub(/^\s*/, "", $2); sub(/,$/, "", $2); print $2; }')
+latest_block_time_stamp=$(cli getblock $latest_block_hash 2> /dev/null | awk -F ':' '($1 ~ /^\s*"time"/) { sub(/^\s*/, "", $2); sub(/,$/, "", $2); print $2; }')
 [ -n "$latest_block_time_stamp" ] || exit 1
 
 latest_block_age=$(( $(date '+%s') - $latest_block_time_stamp ))
