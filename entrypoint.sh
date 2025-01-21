@@ -73,6 +73,7 @@ if [ "$1" = "elementsd" ] || [ "$1" = "elements-cli" ] || [ "$1" = "elements-tx"
       elementsd_pid=$(pgrep -f "^/usr/bin/elementsd -printtoconsole( .+|\$)")
       [ -z "$elementsd_pid" ] || break
       [ $(date '+%s') -lt ${T} ] || { __error "$0: Failed to launch Elements Daemon."; break; }
+      sleep 1
     done
     if [ -n "$elementsd_pid" ]; then
       [ -s "$LIQUIDV1_DATA/.cookie" ] || {

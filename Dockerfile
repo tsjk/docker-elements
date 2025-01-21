@@ -15,9 +15,10 @@ RUN	   eselect repository add bitcoin git https://gitlab.com/bitcoin/gentoo.git\
 	&& mkdir -p /etc/portage/package.accept_keywords\
 	&& echo '*/*::gentoo ~*' > /etc/portage/package.accept_keywords/_gentoo_repository\
 	&& echo '*/*::bitcoin ~*' > /etc/portage/package.accept_keywords/_bitcoin_repository\
-	&& echo '>=net-p2p/elements-23.2.5' >> '/etc/portage/package.mask/net-p2p:elements'\
+	&& echo '<net-p2p/elements-23.2.5' >> '/etc/portage/package.mask/net-p2p:elements'\
+	&& echo '>=net-p2p/elements-23.2.6' >> '/etc/portage/package.mask/net-p2p:elements'\
 	&& mkdir -p /etc/portage/package.accept_keywords\
-	&& echo '~net-p2p/elements-23.2.4::bitcoin **' >> '/etc/portage/package.accept_keywords/net-p2p:elements'\
+	&& echo '~net-p2p/elements-23.2.5::bitcoin **' >> '/etc/portage/package.accept_keywords/net-p2p:elements'\
 	&& mkdir -p /etc/portage/package.use\
 	&& echo 'dev-libs/libsecp256k1-zkp asm bppp ecdh ecdsa-adaptor ecdsa-s2c ellswift experimental extrakeys generator musig rangeproof recovery schnorrsig surjectionproof whitelist' >> '/etc/portage/package.use/net-p2p:elements'\
 	&& echo 'net-p2p/elements asm berkdb cli daemon examples external-signer man sqlite system-leveldb system-libsecp256k1 zeromq -dbus -gui -nat-pmp -qrcode -systemtap -upnp' >> '/etc/portage/package.use/net-p2p:elements'\
