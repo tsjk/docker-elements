@@ -1,0 +1,75 @@
+FROM --platform=${TARGETPLATFORM:-${BUILDPLATFORM}} ghcr.io/void-linux/void-glibc-busybox:latest
+
+ARG TARGETPLATFORM
+
+ENV ELEMENTS_VERSION=23.3.0
+
+RUN    set -ex \
+    && xbps-install -S && xbps-install -uy xbps && xbps-install -uy \
+    && xbps-install -Ay bash gnupg wget \
+    && { for key in \
+           BD0F3062F87842410B06A0432F656B0610604482 \
+           710E44C2DAAE938F778744A1DE8F6EA20A661697 \
+         ; do \
+             gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key" || \
+             gpg --batch --keyserver hkps://api.protonmail.ch --recv-keys "$key" || \
+             gpg --batch --keyserver keys.openpgp.org --recv-keys "$key" || \
+             gpg --batch --keyserver keyserver.pgp.com --recv-keys "$key" || \
+             gpg --batch --keyserver ha.pool.sks-keyservers.net --recv-keys "$key" || \
+             gpg --batch --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "$key" || exit 1; \
+         done; } \
+    && ( cd /opt && \
+           { case ${TARGETPLATFORM} in \
+               "linux/amd64") ELEMENTS_TARBALL="elements-${ELEMENTS_VERSION}-x86_64-linux-gnu.tar.gz" ;; \
+               "linux/arm64"|"linux/arm64/v8") ELEMENTS_TARBALL="elements-${ELEMENTS_VERSION}-aarch64-linux-gnu.tar.gz" ;; \
+               "linux/arm32v7"|"linux/arm32/v7") ELEMENTS_TARBALL="elements-${ELEMENTS_VERSION}-arm-linux-gnueabihf.tar.gz" ;; \
+               *) echo "ERROR: Unsupported TARGETPLATFORM: ${TARGETPLATFORM}."; exit 1  ;; \
+             esac; } \
+           && { for f in ${ELEMENTS_TARBALL} SHA256SUMS.asc; do \
+                  wget --timeout=60 --waitretry=0 --tries=8 https://github.com/ElementsProject/elements/releases/download/elements-${ELEMENTS_VERSION}/${f} || exit 1; done; } \
+           && gpg --output SHA256SUMS --decrypt SHA256SUMS.asc && rm -rf /root/.gnupg \
+           && grep -F " ${ELEMENTS_TARBALL}" SHA256SUMS | sha256sum -c - \
+           && tar -xzf ${ELEMENTS_TARBALL} \
+           && [ -d "/opt/elements-${ELEMENTS_VERSION}/bin" ] \
+           && rm SHA256SUMS.asc SHA256SUMS ${ELEMENTS_TARBALL} \
+       ) \
+    && xbps-install -y \
+         inotify-tools \
+         libevent-devel \
+         shadow \
+         socat \
+         sqlite-devel \
+         su-exec \
+         sudo \
+         tini \
+         util-linux \
+         zeromq-devel \
+    && groupadd -g 1000 -r elements \
+    && useradd -c "elementsd unprivileged user" -m -g 1000 -G users -r -u 1000 elements \
+    && { for f in /opt/elements-${ELEMENTS_VERSION}/bin/*; do \
+           [ "${f}" = "/opt/elements-${ELEMENTS_VERSION}/bin/elements-qt" ] || { printf '\nldd %s:\n' "${f}" && ldd ${f} && printf 'OK: ldd %s\n' "${f}" || exit 1; }; done; }
+
+ENV PATH="/opt/elements-${ELEMENTS_VERSION}/bin:${PATH}"
+
+RUN elementsd -version | grep "Elements Core version v${ELEMENTS_VERSION}" \
+    && xbps-remove -oy \
+    && rm -rf /var/cache/xbps
+
+COPY --chmod=755 ./entrypoint.sh /entrypoint.sh
+
+ENV \
+	ELEMENTSD_HOME=/var/lib/elementsd\
+	ELEMENTSD_CONFIG=/etc/elements\
+	ELEMENTSD_CHAIN=liquidv1
+ENV \
+	ELEMENTSD_RPC_PORT=7041\
+	ELEMENTSD_PORT=7042\
+	LIQUIDV1_DATA=${ELEMENTSD_HOME}/${ELEMENTSD_CHAIN}
+
+VOLUME "${ELEMENTSD_HOME}" "${ELEMENTSD_CONFIG}"
+
+EXPOSE ${ELEMENTSD_PORT} ${ELEMENTSD_RPC_PORT}
+
+ENTRYPOINT [ "/usr/bin/tini", "-g", "--", "/entrypoint.sh" ]
+
+CMD ["elementsd"]

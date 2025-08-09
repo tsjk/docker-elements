@@ -19,6 +19,13 @@ __error() {
   echo "ERROR: ${*}" >&2; exit 1
 }
 
+if [ -x '/usr/bin/elementsd' ]; then
+  ELEMENTSD_PREFIX="/usr"
+else
+  ELEMENTSD_PREFIX=$(ls -1d /opt/elements-* 2> /dev/null | sort -V | tail -n 1)
+fi
+ELEMENTSD_EXECUTABLE="$ELEMENTSD_PREFIX/bin/elementsd"
+[ -x "$ELEMENTSD_EXECUTABLE" ] || __error "elementsd executable not found"
 
 if echo "${PUID}" | grep -q -E '^[0-9][0-9]*$' && echo "${PGID}" | grep -q -E '^[0-9][0-9]*$' && [ ${PUID} -ne 0 ] && [ ${PGID} -ne 0 ]; then
     { [ $(getent group elements | cut -d ':' -f 3) -eq ${PGID} ] || groupmod --non-unique --gid ${PGID} elements; } && \
@@ -35,7 +42,7 @@ fi
 
 if [ "$1" = "elementsd" ]; then
   mkdir -p "$LIQUIDV1_DATA" && { \
-    pgrep -f "^/usr/bin/elementsd -printtoconsole( .+|\$)" > /dev/null || { \
+    pgrep -f "^$ELEMENTSD_EXECUTABLE -printtoconsole( .+|\$)" > /dev/null || { \
       rm -f "$LIQUIDV1_DATA/.pid" || __error "Failed to remove old pidfile!"
       rm -f "$LIQUIDV1_DATA/.cookie" || __error "Failed to remove cookie file!"
       cat /dev/null > "$LIQUIDV1_DATA/debug.log"
@@ -67,10 +74,10 @@ if [ "$1" = "elementsd" ] || [ "$1" = "elements-cli" ] || [ "$1" = "elements-tx"
       done
     fi
     __info "$0: launching elementsd as a background job"; echo
-    shift 1; su -s /bin/sh -c "exec /usr/bin/elementsd -printtoconsole $*" elements $(: elementsd) &
+    shift 1; su -s /bin/sh -c "exec $ELEMENTSD_EXECUTABLE -printtoconsole $*" elements $(: elementsd) &
     T=$(( $(date '+%s') + 10))
     while true; do
-      elementsd_pid=$(pgrep -f "^/usr/bin/elementsd -printtoconsole( .+|\$)")
+      elementsd_pid=$(pgrep -f "^$ELEMENTSD_EXECUTABLE -printtoconsole( .+|\$)")
       [ -z "$elementsd_pid" ] || break
       [ $(date '+%s') -lt ${T} ] || { __error "$0: Failed to launch Elements Daemon."; break; }
       sleep 1
