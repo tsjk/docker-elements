@@ -7,7 +7,7 @@
 CHAIN="$1"; shift 1
 [ -s "/var/lib/elementsd/$CHAIN/.cookie" ] || exit 1
 
-cli() { timeout -k 60s 50s elements-cli -conf="/etc/elements/elements.conf" -datadir="/var/lib/elementsd" -chain="$CHAIN" -rpccookiefile="/var/lib/elementsd/$CHAIN/.cookie" "$@"; }
+cli() { timeout 60 elements-cli -conf="/etc/elements/elements.conf" -datadir="/var/lib/elementsd" -chain="$CHAIN" -rpccookiefile="/var/lib/elementsd/$CHAIN/.cookie" "$@"; }
 
 get_getblockchaininfo_value_for_key() {
   [ -n "$1" ] && \
