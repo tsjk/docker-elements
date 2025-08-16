@@ -6,7 +6,8 @@ ENV ELEMENTS_VERSION=23.3.0
 
 RUN    set -ex \
     && xbps-install -S && xbps-install -uy xbps && xbps-install -uy \
-    && xbps-install -Ay bash gnupg wget \
+    && xbps-install -y bash \
+    && xbps-install -Ay gnupg wget \
     && { for key in \
            BD0F3062F87842410B06A0432F656B0610604482 \
            710E44C2DAAE938F778744A1DE8F6EA20A661697 \
@@ -27,11 +28,11 @@ RUN    set -ex \
              esac; } \
            && { for f in ${ELEMENTS_TARBALL} SHA256SUMS.asc; do \
                   wget --timeout=60 --waitretry=0 --tries=8 https://github.com/ElementsProject/elements/releases/download/elements-${ELEMENTS_VERSION}/${f} || exit 1; done; } \
-           && gpg --output SHA256SUMS --decrypt SHA256SUMS.asc && rm -rf /root/.gnupg \
+           && gpg --output SHA256SUMS --decrypt SHA256SUMS.asc \
            && grep -F " ${ELEMENTS_TARBALL}" SHA256SUMS | sha256sum -c - \
            && tar -xzf ${ELEMENTS_TARBALL} \
            && [ -d "/opt/elements-${ELEMENTS_VERSION}/bin" ] \
-           && rm SHA256SUMS.asc SHA256SUMS ${ELEMENTS_TARBALL} \
+           && rm SHA256SUMS.asc SHA256SUMS ${ELEMENTS_TARBALL} && rm -rf /root/.gnupg \
        ) \
     && xbps-install -y \
          inotify-tools \
@@ -46,7 +47,7 @@ RUN    set -ex \
          zeromq-devel \
     && groupadd -g 1000 -r elements \
     && useradd -c "elementsd unprivileged user" -m -g 1000 -G users -r -u 1000 elements \
-    && { for f in /opt/elements-${ELEMENTS_VERSION}/bin/*; do \
+    && { set +x && for f in /opt/elements-${ELEMENTS_VERSION}/bin/*; do \
            [ "${f}" = "/opt/elements-${ELEMENTS_VERSION}/bin/elements-qt" ] || { printf '\nldd %s:\n' "${f}" && ldd ${f} && printf 'OK: ldd %s\n' "${f}" || exit 1; }; done; }
 
 ENV PATH="/opt/elements-${ELEMENTS_VERSION}/bin:${PATH}"

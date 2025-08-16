@@ -1,6 +1,5 @@
-#!/usr/bin/env sh
-
-set -m
+#!/bin/bash
+set -e -m
 
 : "${DO_CHMOD:=true}"
 : "${DO_CHOWN:=true}"
@@ -27,18 +26,19 @@ fi
 ELEMENTSD_EXECUTABLE="$ELEMENTSD_PREFIX/bin/elementsd"
 [ -x "$ELEMENTSD_EXECUTABLE" ] || __error "elementsd executable not found"
 
-[ -z "${PUID}" ] || echo "${PUID}" | grep -q -E '^[0-9][0-9]*$' || __error "Invalid PUID setting."
-[ -z "${PGID}" ] || echo "${PGID}" | grep -q -E '^[0-9][0-9]*$' || __error "Invalid PGID setting."
+[ -z "$PUID" ] || echo "$PUID" | grep -q -E '^[0-9][0-9]*$' || __error "Invalid PUID setting."
+[ -z "$PGID" ] || echo "$PGID" | grep -q -E '^[0-9][0-9]*$' || __error "Invalid PGID setting."
+__info "$0: PUID=$PUID; PGID=$PGID"
 
-if echo "${PUID}" | grep -q -E '^[0-9][0-9]*$' && echo "${PGID}" | grep -q -E '^[0-9][0-9]*$' && [ "${PUID}" -ne 0 ] && [ "${PGID}" -ne 0 ]; then
-    { [ $(getent group elements | cut -d ':' -f 3) -eq "${PGID}" ] || groupmod --non-unique --gid "${PGID}" elements; } && \
-      { [ $(getent passwd elements | cut -d ':' -f 3) -eq "${PUID}" ] || usermod --non-unique --uid "${PUID}" elements; } || \
+if echo "$PUID" | grep -q -E '^[0-9][0-9]*$' && echo "$PGID" | grep -q -E '^[0-9][0-9]*$' && [ "$PUID" -ne 0 ] && [ "$PGID" -ne 0 ]; then
+    { [ $(getent group elements | cut -d ':' -f 3) -eq "$PGID" ] || groupmod --non-unique --gid "$PGID" elements; } && \
+      { [ $(getent passwd elements | cut -d ':' -f 3) -eq "$PUID" ] || usermod --non-unique --uid "$PUID" elements; } || \
       __error "Failed to change uid or gid or \"elements\" user."
-  __info "$0: assuming uid:gid for elements:elements of $(id -u elements):$(id -g elements)"
+  __info "$0: uid:gid for elements:elements is $(id -u elements):$(id -g elements)"
 fi
 
 if [ $(echo "$1" | cut -c1) = "-" ]; then
-  __info "$0: assuming supplied arguments are for elementsd"
+  __info "$0: assuming supplied arguments (\"$*\") are for elementsd"
   set -- elementsd "$@"
 fi
 
@@ -53,15 +53,17 @@ if [ "$1" = "elementsd" ]; then
     }
   } || __error "$0: Failed to operate on data directory!"
 
-  if [ -s "$ELEMENTSD_CONFIG/elements.conf" ]; then
+  if [ -n "$ELEMENTSD_CONFIG" ] && [ -s "$ELEMENTSD_CONFIG/elements.conf" ]; then
     __info "$0: setting config file to \"$ELEMENTSD_CONFIG/elements.conf\""
-    set -- "$@" -conf="\"$ELEMENTSD_CONFIG/elements.conf\""
-  elif [ -s "$ELEMENTSD_HOME/elements.conf" ]; then
+    set -- "$@" -conf="$ELEMENTSD_CONFIG/elements.conf"
+  elif [ -n "$ELEMENTSD_HOME" ] && [ -s "$ELEMENTSD_HOME/elements.conf" ]; then
     __info "$0: setting config file to \"$ELEMENTSD_HOME/elements.conf\""
-    set -- "$@" -conf="\"$ELEMENTSD_HOME/elements.conf\""
+    set -- "$@" -conf="$ELEMENTSD_HOME/elements.conf"
   fi
-  __info "$0: setting data directory to \"$ELEMENTSD_HOME\""
-  set -- "$@" -datadir="\"$ELEMENTSD_HOME\""
+  if [ -n "$ELEMENTSD_HOME" ]; then
+    __info "$0: setting data directory to \"$ELEMENTSD_HOME\""
+    set -- "$@" -datadir="$ELEMENTSD_HOME"
+  fi
 fi
 
 if [ "$1" = "elementsd" ] || [ "$1" = "elements-cli" ] || [ "$1" = "elements-tx" ] || [ "$1" = "elements-wallet" ]; then
@@ -76,7 +78,7 @@ if [ "$1" = "elementsd" ] || [ "$1" = "elements-cli" ] || [ "$1" = "elements-tx"
       done
     fi
     __info "$0: launching elementsd as a background job"; echo; shift 1
-    if [ "${PUID}" -ne "0" ]; then
+    if [ -n "$PUID" ] && [ "$PUID" -ne "0" ]; then
       su -s /bin/sh -c "exec $ELEMENTSD_EXECUTABLE -printtoconsole $*" elements $(: elementsd) &
     else
       $ELEMENTSD_EXECUTABLE -printtoconsole "$@" $(: elementsd) &
@@ -100,7 +102,7 @@ if [ "$1" = "elementsd" ] || [ "$1" = "elements-cli" ] || [ "$1" = "elements-tx"
         done; }
       [ ! -s "$LIQUIDV1_DATA/.cookie" ] || chmod g+r "$LIQUIDV1_DATA/.cookie"
       __info "$0: launched elementsd as a background job"
-      if [ "${PUID}" -ne "0" ]; then
+      if [ -n "$PUID" ] && [ "$PUID" -ne "0" ]; then
         su -s /bin/sh -c "echo $elementsd_pid > \"$LIQUIDV1_DATA/.pid\"" elements
       else
         echo $elementsd_pid > "$LIQUIDV1_DATA/.pid"
@@ -121,8 +123,8 @@ if [ "$1" = "elementsd" ] || [ "$1" = "elements-cli" ] || [ "$1" = "elements-tx"
       __error "$0: Failed to launch Elements Daemon."
     fi
   else
-    echo; if [ "${PUID}" -ne "0" ]; then sudo -u elements -- "$@"; else "$@"; fi
+    echo; if [ -n "$PUID" ] && [ "$PUID" -ne "0" ]; then sudo -u elements -- "$@"; else "$@"; fi
   fi
 else
-  echo; if [ "${PUID}" -ne "0" ]; then su-exec elements "$@"; else exec "$@"; fi
+  echo; if [ -n "$PUID" ] && [ "$PUID" -ne "0" ]; then su-exec elements "$@"; else exec "$@"; fi
 fi
