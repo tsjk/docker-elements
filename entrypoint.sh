@@ -48,8 +48,11 @@ if [ "$1" = "elementsd" ]; then
       rm -f "$LIQUIDV1_DATA/.pid" || __error "Failed to remove old pidfile!"
       rm -f "$LIQUIDV1_DATA/.cookie" || __error "Failed to remove cookie file!"
       cat /dev/null > "$LIQUIDV1_DATA/debug.log"
-      [ "${DO_CHOWN}" != "true" ] || chown -R elements "$LIQUIDV1_DATA" || __error "chown failed!"
-      [ "${DO_CHMOD}" != "true" ] || { chmod -R o-rwx "$LIQUIDV1_DATA" && chmod -R g-w "$LIQUIDV1_DATA"; } || __error "chmod failed!"
+      [ "$DO_CHOWN" != "true" ] || [ -z "$PUID" ] || {
+        [ "$PUID" -ne 0 ] && CHOWN_USER='elements' || CHOWN_USER='root'
+        chown -R "$CHOWN_USER" "$LIQUIDV1_DATA" || __error "chown failed!"
+      }
+      [ "$DO_CHMOD" != "true" ] || { chmod -R o-rwx "$LIQUIDV1_DATA" && chmod -R g-w "$LIQUIDV1_DATA"; } || __error "chmod failed!"
     }
   } || __error "$0: Failed to operate on data directory!"
 
