@@ -2,7 +2,7 @@ FROM --platform=${TARGETPLATFORM:-${BUILDPLATFORM}} ghcr.io/void-linux/void-glib
 
 ARG TARGETPLATFORM
 
-ENV ELEMENTS_VERSION=23.3.0
+ENV ELEMENTS_VERSION=23.3.1
 
 RUN    set -ex \
     && xbps-install -S && xbps-install -uy xbps && xbps-install -uy \
@@ -52,7 +52,7 @@ RUN    set -ex \
 
 ENV PATH="/opt/elements-${ELEMENTS_VERSION}/bin:${PATH}"
 
-RUN elementsd -version | grep "Elements Core version v${ELEMENTS_VERSION}" \
+RUN elementsd -version | grep -F "Elements Core version v${ELEMENTS_VERSION}" \
     && xbps-remove -oy \
     && rm -rf /var/cache/xbps
 
