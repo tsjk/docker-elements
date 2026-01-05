@@ -1,27 +1,31 @@
 #!/bin/bash
 set -e -m
 
+if [ "$1" = "--debug-entrypoint" ]; then
+  shift 1; set -x
+fi
+
 : "${DO_CHMOD:=true}"
 : "${DO_CHOWN:=true}"
 
 __info() {
-  if [ "${1}" = "-q" ]; then
-    shift 1; echo "${*}"
+  if [ "$1" = "-q" ]; then
+    shift 1; echo "$*"
   else
-    echo "INFO: ${*}"
+    echo "INFO: $*"
   fi
 }
 __warning() {
-  echo "WARNING: ${*}" >&2
+  echo "WARNING: $*" >&2
 }
 __error() {
-  echo "ERROR: ${*}" >&2; exit 1
+  echo "ERROR: $*" >&2; exit 1
 }
 
 if [ -x '/usr/bin/elementsd' ]; then
   ELEMENTSD_PREFIX="/usr"
 else
-  ELEMENTSD_PREFIX=$(ls -1d /opt/elements-* 2> /dev/null | sort -V | tail -n 1)
+  ELEMENTSD_PREFIX=$(find /opt/ -maxdepth 1 -mindepth 1 -name 'elements-*' 2> /dev/null | sort -V | tail -n 1)
 fi
 ELEMENTSD_EXECUTABLE="$ELEMENTSD_PREFIX/bin/elementsd"
 [ -x "$ELEMENTSD_EXECUTABLE" ] || __error "elementsd executable not found"
@@ -31,13 +35,15 @@ ELEMENTSD_EXECUTABLE="$ELEMENTSD_PREFIX/bin/elementsd"
 __info "$0: PUID=$PUID; PGID=$PGID"
 
 if echo "$PUID" | grep -q -E '^[0-9][0-9]*$' && echo "$PGID" | grep -q -E '^[0-9][0-9]*$' && [ "$PUID" -ne 0 ] && [ "$PGID" -ne 0 ]; then
-    { [ $(getent group elements | cut -d ':' -f 3) -eq "$PGID" ] || groupmod --non-unique --gid "$PGID" elements; } && \
-      { [ $(getent passwd elements | cut -d ':' -f 3) -eq "$PUID" ] || usermod --non-unique --uid "$PUID" elements; } || \
+    { [ "$(getent group elements | cut -d ':' -f 3)" -eq "$PGID" ] || groupmod --non-unique --gid "$PGID" elements; } && \
+      { [ "$(getent passwd elements | cut -d ':' -f 3)" -eq "$PUID" ] || usermod --non-unique --uid "$PUID" elements; } || \
       __error "Failed to change uid or gid or \"elements\" user."
   __info "$0: uid:gid for elements:elements is $(id -u elements):$(id -g elements)"
 fi
 
-if [ $(echo "$1" | cut -c1) = "-" ]; then
+if [ $# -eq 0 ]; then
+  set -- elementsd
+elif [ -n "$1" ] && [ "$(echo "$1" | cut -c1)" = "-" ]; then
   __info "$0: assuming supplied arguments (\"$*\") are for elementsd"
   set -- elementsd "$@"
 fi
@@ -88,27 +94,27 @@ if [ "$1" = "elementsd" ] || [ "$1" = "elements-cli" ] || [ "$1" = "elements-tx"
     fi
     T=$(( $(date '+%s') + 10))
     while true; do
-      elementsd_pid=$(pgrep -f "^$ELEMENTSD_EXECUTABLE -printtoconsole( .+|\$)")
+      elementsd_pid=$(pgrep -f "^$ELEMENTSD_EXECUTABLE -printtoconsole( .+|\$)" 2> /dev/null || true)
       [ -z "$elementsd_pid" ] || break
-      [ $(date '+%s') -lt ${T} ] || { __error "$0: Failed to launch Elements Daemon."; break; }
+      [ "$(date '+%s')" -lt "$T" ] || { __error "$0: Failed to launch Elements Daemon."; break; }
       sleep 1
     done
     if [ -n "$elementsd_pid" ]; then
       [ -s "$LIQUIDV1_DATA/.cookie" ] || {
         T=$(( $(date '+%s') + 900))
         while true; do
-          t=$(( T - $(date '+%s') )); [ ${t} -lt 10 ] || t=10
-          i=$(inotifywait --event create,open --format '%f' --timeout ${t} --quiet "$LIQUIDV1_DATA")
-          kill -0 $elementsd_pid > /dev/null 2>&1 || __error "$0: Elements Daemon died unexpectidly."
-          if [ "${i}" = ".cookie" ] || [ -s "$LIQUIDV1_DATA/.cookie" ]; then break; fi
-          [ $(date '+%s') -lt ${T} ] || { __warning "$0: Failed to get notification for Elements Daemon cookie file."; break; }
+          t=$(( T - $(date '+%s') )); [ "$t" -lt "10" ] || t=10
+          i=$(inotifywait --event create,open --format '%f' --timeout $t --quiet "$LIQUIDV1_DATA" || true)
+          kill -0 "$elementsd_pid" > /dev/null 2>&1 || __error "$0: Elements Daemon died unexpectidly."
+          if [ "$i" = ".cookie" ] || [ -s "$LIQUIDV1_DATA/.cookie" ]; then break; fi
+          [ "$(date '+%s')" -lt "$T" ] || { __warning "$0: Failed to get notification for Elements Daemon cookie file."; break; }
         done; }
-      [ ! -s "$LIQUIDV1_DATA/.cookie" ] || chmod g+r "$LIQUIDV1_DATA/.cookie"
+      [ ! -s "$LIQUIDV1_DATA/.cookie" ] || chmod g+r "$LIQUIDV1_DATA/.cookie" || __error "$0: Failed to change permissions on \"$LIQUIDV1_DATA/.cookie\"!"
       __info "$0: launched elementsd as a background job"
       if [ -n "$PUID" ] && [ "$PUID" -ne "0" ]; then
-        su -s /bin/sh -c "echo $elementsd_pid > \"$LIQUIDV1_DATA/.pid\"" elements
+        su -s /bin/sh -c "echo \"$elementsd_pid\" > \"$LIQUIDV1_DATA/.pid\"" elements
       else
-        echo $elementsd_pid > "$LIQUIDV1_DATA/.pid"
+        echo "$elementsd_pid" > "$LIQUIDV1_DATA/.pid"
       fi
       echo
       if [ -d "$LIQUIDV1_DATA/.post_start.d" ]; then
@@ -120,7 +126,7 @@ if [ "$1" = "elementsd" ] || [ "$1" = "elements-cli" ] || [ "$1" = "elements-tx"
           fi
         done
       fi
-      kill -0 $elementsd_pid > /dev/null 2>&1 || __error "$0: Failed to start Elements Daemon."
+      kill -0 "$elementsd_pid" > /dev/null 2>&1 || __error "$0: Failed to start Elements Daemon."
       __info "$0: Foregrounding Elements Daemon."; fg '%?elementsd'
     else
       __error "$0: Failed to launch Elements Daemon."
