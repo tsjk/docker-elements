@@ -16,10 +16,10 @@ RUN	   eselect repository add bitcoin git https://gitlab.com/bitcoin/gentoo.git\
 	&& echo '*/*::gentoo ~*' > /etc/portage/package.accept_keywords/_gentoo_repository\
 	&& echo '*/*::bitcoin ~*' > /etc/portage/package.accept_keywords/_bitcoin_repository\
 	&& echo '>=dev-libs/boost-1.91::gentoo' >> /etc/portage/package.mask/dev-libs:boost\
-	&& echo '<net-p2p/elements-23.3.3' >> '/etc/portage/package.mask/net-p2p:elements'\
-	&& echo '>net-p2p/elements-23.3.3' >> '/etc/portage/package.mask/net-p2p:elements'\
+	&& echo '<net-p2p/elements-23.3.4' >> '/etc/portage/package.mask/net-p2p:elements'\
+	&& echo '>net-p2p/elements-23.3.4' >> '/etc/portage/package.mask/net-p2p:elements'\
 	&& mkdir -p /etc/portage/package.accept_keywords\
-	&& echo '~net-p2p/elements-23.3.3::bitcoin **' >> '/etc/portage/package.accept_keywords/net-p2p:elements'\
+	&& echo '~net-p2p/elements-23.3.4::bitcoin **' >> '/etc/portage/package.accept_keywords/net-p2p:elements'\
 	&& mkdir -p /etc/portage/package.use\
 	&& echo 'dev-libs/libsecp256k1-zkp asm bppp ecdh ecdsa-adaptor ecdsa-s2c ellswift experimental extrakeys generator musig rangeproof recovery schnorrsig surjectionproof whitelist' >> '/etc/portage/package.use/net-p2p:elements'\
 	&& echo 'net-p2p/elements asm berkdb cli daemon examples external-signer man sqlite system-libsecp256k1 zeromq -dbus -gui -nat-pmp -qrcode -systemtap -upnp' >> '/etc/portage/package.use/net-p2p:elements'\
@@ -27,6 +27,7 @@ RUN	   eselect repository add bitcoin git https://gitlab.com/bitcoin/gentoo.git\
 
 RUN	   . /.functions.sh\
 	&& emaint sync -r bitcoin\
+        && ( cd /var/db/repos/bitcoin/net-p2p/elements && cp -a elements-23.3.3.ebuild elements-23.3.4.ebuild && ebuild elements-23.3.4.ebuild digest )\
 	&& emerge -1 -q -u sys-apps/portage\
 	&& __fetch_and_merge net-p2p/elements
 
